@@ -8,32 +8,31 @@ class cgRecord:
     barcode = ''
     files = []
     sums = []
-    disease = ''
 
 MASTER = '/rsrch1/rists/cghub/RECORDS.LOG'
 
-def cgdownload(analysis, children, disease, norecord, *icgc_url):
+def cgdownload(analysis, children, norecord, *icgc_url):
 # download either a list of samples in a file or single sample
     cwd = os.getcwd()
     file = os.path.join(cwd, analysis)
-    
+    print file
+    print icgc_url
     rec_dict = log2dict(MASTER)
     if os.path.isfile(file):
-        download_file(file, children, rec_dict, disease, norecord, *icgc_url)
+   	print "file ", file
+	print "children ", children
+        download_file(file, children, rec_dict, norecord, *icgc_url)
     else:
-        download_single(cwd, analysis, children, rec_dict, disease, norecord, *icgc_url)
+	print "analysis ", analysis
+   	print "children ", children
+        download_single(cwd, analysis, children, rec_dict, norecord, *icgc_url)
 
-def download_single(path, analysis, children, rec_dict, disease, norecord, *icgc_url):
+def download_single(path, analysis, children, rec_dict, norecord, *icgc_url):
 # Downloads single sample by analysis_id
 
     # If sample is downloadable
     if cgquery_check(analysis, *icgc_url):
       	record = get_info("%s/%s.info" % (path, analysis))[0]
-#	bar = record.barcode
-  	# check if disease for the record matches argument specified with '-d'
-        if disease != 'all' and record.disease != disease:
-	    print "Disease type does not match for " + analysis + ": " + record.disease
-	    return
 	dir = os.path.join(path, analysis)
 	filename = record.files[0]
 	checksum = record.sums[0]
@@ -110,12 +109,10 @@ def download_single(path, analysis, children, rec_dict, disease, norecord, *icgc
 	print "If you want to read from a file, please make sure the file exists!"
 
     
-def download_file(file, children, rec_dict, disease, norecord, *icgc_url):
+def download_file(file, children, rec_dict, norecord, *icgc_url):
 # Downloads a list of samples with analysis_id file
-    print file
     f = open(file, 'r')
     lines = f.readlines()
-    print "lines ", lines
     path = os.getcwd()
     if len(icgc_url) > 0:
 	if not icgc_url[0].startswith('http'):
@@ -131,12 +128,12 @@ def download_file(file, children, rec_dict, disease, norecord, *icgc_url):
 	analysis = line.rstrip()
 	if len(icgc_url) > 0:
 	    if icgc_url[0].startswith('http'):
-		download_single(path, analysis, children, rec_dict, disease, norecord, icgc_url[0])
+		download_single(path, analysis, children, rec_dict, norecord, icgc_url[0])
 	    else:
 	    	link = icgc_lines(i).rstrip()
-	    	download_single(path, analysis, children, rec_dict, disease, norecord, link)
+	    	download_single(path, analysis, children, rec_dict, norecord, link)
 	else:
-	    download_single(path, analysis, children, rec_dict, disease, norecord)
+	    download_single(path, analysis, children, rec_dict, norecord)
 
 def cgquery_check(analysis, *icgc_url):
 # check with cgquery to see if the sample with analysis id is available to download from cghub
@@ -149,6 +146,7 @@ def cgquery_check(analysis, *icgc_url):
     out,err = query_pipe.communicate()
     query_pipe.wait()
     print "returncode ", query_pipe.returncode
+    print out
     name = analysis + '.info'
     file = open(name, 'w')
     for row in out.splitlines():
@@ -191,13 +189,11 @@ def get_info(info_file):
 	if 'legacy_sample_id' in line:
 	    barcode = line.split('             : ')[1].rstrip()
 	if 'disease_abbr' in line:
-	    disease = line.split('                 : ')[1].rstrip()
 	    record = cgRecord()
 	    record.analysis = analysis
 	    record.barcode = barcode
 	    record.files = files
 	    record.sums = sums
-	    record.disease = disease
 	    record_list.append(record)
 	    print analysis
 	    files = []
@@ -228,32 +224,19 @@ def main():
     parser = argparse.ArgumentParser(description='Cghub download tool')
     parser.add_argument('-c', dest='children', help='gtdownload max_children', default=4, type=int)
     parser.add_argument('-a', dest='analysis', help='anlaysis ID', required=True)
-    parser.add_argument('-d', dest='disease', help='disease type')
     parser.add_argument('-l', dest='url', help='GNOS endpoint')
     parser.add_argument('--norecord', action='store_true', help='download without updating master log')
     args = parser.parse_args()
-    if args.disease == None:
-	if args.norecord:
-	    if args.url == None:
-	    	cgdownload(args.analysis, args.children, 'all', 1)
-	    else:
-		cgdownload(args.analysis, args.children, 'all', 1, args.url)
+    if args.norecord:
+	if args.url == None:
+	    cgdownload(args.analysis, args.children, 1)
 	else:
-	    if args.url == None:
-	    	cgdownload(args.analysis, args.children, 'all', 0)
-	    else:
-	 	cgdownload(args.analysis, args.children, 'all', 0, args.url)
+	    cgdownload(args.analysis, args.children, 1, args.url)
     else:
-	if args.norecord:
-	    if args.url == None:
-	    	cgdownload(args.analysis, args.children, args.disease, 1)
-	    else:
-		cgdownload(args.analysis, args.children, args.disease, 1, args.url)
+	if args.url == None:
+	    cgdownload(args.analysis, args.children, 0)
 	else:
-	    if args.url == None:
-	    	cgdownload(args.analysis, args.children, args.disease, 0)
-	    else:
-		cgdownload(args.analysis, args.children, args.disease, 0, args.url)
+	    cgdownload(args.analysis, args.children, 0, args.url)
 #    cgdownload(args.analysis, args.children, args.disease)
 #    parser.add_argument('-t' dest='threads', help='threads of downloads', default=1, type=int)
  
